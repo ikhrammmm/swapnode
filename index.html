@@ -48,18 +48,19 @@
     </div>
 
 <script>
-    let nodeIndex = 0;
+    let internalIdCounter = 0; // Unique ID for scanning logic
     let currentTargetInput = null;
     let html5QrCode = null;
 
     window.onload = () => addNode();
 
     function addNode() {
-        nodeIndex++;
+        internalIdCounter++;
         const container = document.getElementById('nodes-container');
         const nodeWrapper = document.createElement('div');
         nodeWrapper.className = 'card';
-        nodeWrapper.id = `node-card-${nodeIndex}`;
+        // We use an internal ID for the HTML elements so they stay unique
+        nodeWrapper.dataset.internalId = internalIdCounter;
         
         const rows = ['A','B','C','D','E','F','G','H','I','J'];
         const dhOptions = Array.from({length: 10}, (_, i) => `<option value="V1.${i+1}">V1.${i+1}</option>`).join('');
@@ -69,40 +70,52 @@
 
         nodeWrapper.innerHTML = `
             <div class="node-header">
-                <strong>Unit Information #${nodeIndex}</strong>
-                ${nodeIndex > 1 ? `<button class="delete-node" onclick="removeNode(${nodeIndex})">Remove</button>` : ''}
+                <strong class="node-number-label">Unit Information</strong>
+                <button class="delete-node" onclick="removeNode(this)">Remove</button>
             </div>
             
             <label>Backup SN</label>
-            <input type="text" id="backup-sn-${nodeIndex}" placeholder="Scan Barcode/QR" value="">
-            <button class="btn-scan" onclick="startScanner('backup-sn-${nodeIndex}')">📷 Scan Backup</button>
+            <input type="text" id="backup-sn-${internalIdCounter}" placeholder="Scan Barcode/QR" value="">
+            <button class="btn-scan" onclick="startScanner('backup-sn-${internalIdCounter}')">📷 Scan Backup</button>
 
             <div class="grid">
-                <div><label>Data Hall</label><select id="backup-dh-${nodeIndex}">${dhOptions}</select></div>
-                <div><label>Row</label><select id="backup-row-${nodeIndex}">${rowOptions}</select></div>
-                <div><label>Rack No</label><select id="backup-rack-${nodeIndex}">${rackOptions}</select></div>
-                <div><label>U Number</label><select id="backup-u-${nodeIndex}">${uOptions}</select></div>
+                <div><label>Data Hall</label><select id="backup-dh-${internalIdCounter}">${dhOptions}</select></div>
+                <div><label>Row</label><select id="backup-row-${internalIdCounter}">${rowOptions}</select></div>
+                <div><label>Rack No</label><select id="backup-rack-${internalIdCounter}">${rackOptions}</select></div>
+                <div><label>U Number</label><select id="backup-u-${internalIdCounter}">${uOptions}</select></div>
             </div>
-            
             <hr>
-
             <label>Faulty SN</label>
-            <input type="text" id="faulty-sn-${nodeIndex}" placeholder="Scan Barcode/QR" value="">
-            <button class="btn-scan" onclick="startScanner('faulty-sn-${nodeIndex}')">📷 Scan Faulty</button>
+            <input type="text" id="faulty-sn-${internalIdCounter}" placeholder="Scan Barcode/QR" value="">
+            <button class="btn-scan" onclick="startScanner('faulty-sn-${internalIdCounter}')">📷 Scan Faulty</button>
 
             <div class="grid">
-                <div><label>Data Hall</label><select id="faulty-dh-${nodeIndex}">${dhOptions}</select></div>
-                <div><label>Row</label><select id="faulty-row-${nodeIndex}">${rowOptions}</select></div>
-                <div><label>Rack No</label><select id="faulty-rack-${nodeIndex}">${rackOptions}</select></div>
-                <div><label>U Number</label><select id="faulty-u-${nodeIndex}">${uOptions}</select></div>
+                <div><label>Data Hall</label><select id="faulty-dh-${internalIdCounter}">${dhOptions}</select></div>
+                <div><label>Row</label><select id="faulty-row-${internalIdCounter}">${rowOptions}</select></div>
+                <div><label>Rack No</label><select id="faulty-rack-${internalIdCounter}">${rackOptions}</select></div>
+                <div><label>U Number</label><select id="faulty-u-${internalIdCounter}">${uOptions}</select></div>
             </div>
         `;
         container.appendChild(nodeWrapper);
+        updateLabels();
     }
 
-    function removeNode(idx) {
-        const el = document.getElementById(`node-card-${idx}`);
-        if (el) el.remove();
+    function removeNode(btn) {
+        btn.closest('.card').remove();
+        updateLabels();
+    }
+
+    // This function re-numbers everything on screen
+    function updateLabels() {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            const label = card.querySelector('.node-number-label');
+            label.innerText = `Unit Information #${index + 1}`;
+            
+            // Hide delete button if it's the only node left
+            const delBtn = card.querySelector('.delete-node');
+            delBtn.style.display = (cards.length === 1) ? 'none' : 'block';
+        });
     }
 
     function startScanner(inputId) {
@@ -110,21 +123,15 @@
         document.getElementById('scanner-ui').style.display = 'block';
         if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
 
-        const config = { 
-            fps: 15, 
-            qrbox: { width: 280, height: 200 },
-            aspectRatio: 1.0 
-        };
-
         html5QrCode.start(
             { facingMode: "environment" }, 
-            config,
+            { fps: 15, qrbox: { width: 280, height: 200 } },
             (text) => {
                 document.getElementById(currentTargetInput).value = text;
                 stopScanner();
             }
         ).catch(err => {
-            alert("Camera Error: Ensure you are on HTTPS and have given camera permissions.");
+            alert("Camera Error: Check HTTPS and permissions.");
             document.getElementById('scanner-ui').style.display = 'none';
         });
     }
@@ -137,11 +144,11 @@
         }
     }
 
-    function formatLoc(type, idx) {
-        const dh = document.getElementById(`${type}-dh-${idx}`).value.replace('.', '-');
-        const row = document.getElementById(`${type}-row-${idx}`).value;
-        const rack = document.getElementById(`${type}-rack-${idx}`).value;
-        const u = document.getElementById(`${type}-u-${idx}`).value;
+    function formatLoc(type, internalId) {
+        const dh = document.getElementById(`${type}-dh-${internalId}`).value.replace('.', '-');
+        const row = document.getElementById(`${type}-row-${internalId}`).value;
+        const rack = document.getElementById(`${type}-rack-${internalId}`).value;
+        const u = document.getElementById(`${type}-u-${internalId}`).value;
         return `${dh}.OS30 ${row}${rack}/U${u}`;
     }
 
@@ -153,7 +160,7 @@
         if (cards.length === 0) return alert("No nodes to copy.");
 
         cards.forEach((card) => {
-            const id = card.id.replace('node-card-', '');
+            const id = card.dataset.internalId;
             output += `Backup SN : ${document.getElementById(`backup-sn-${id}`).value}\n`;
             output += `Location : ${formatLoc('backup', id)}\n`;
             output += `Faulty SN : ${document.getElementById(`faulty-sn-${id}`).value}\n`;
@@ -166,9 +173,9 @@
     }
 
     function clearData() {
-        if(confirm("This will clear all entries. Continue?")) {
+        if(confirm("Clear everything?")) {
             document.getElementById('nodes-container').innerHTML = '';
-            nodeIndex = 0;
+            internalIdCounter = 0;
             addNode();
         }
     }

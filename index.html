@@ -6,19 +6,24 @@
     <title>SWAP NODE Tracker</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; background: #f4f4f9; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; position: relative; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        label { font-size: 0.8rem; color: #666; display: block; }
-        select, input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
-        button { cursor: pointer; padding: 10px 15px; border: none; border-radius: 4px; font-weight: bold; }
-        .btn-scan { background: #007bff; color: white; margin-top: 5px; }
-        .btn-add { background: #28a745; color: white; width: 100%; font-size: 1rem; }
-        .btn-copy { background: #17a2b8; color: white; margin-right: 10px; }
-        .btn-clear { background: #dc3545; color: white; }
-        #reader { width: 100%; max-width: 400px; margin: 0 auto; display: none; }
-        .node-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; margin-bottom: 10px; }
-        .delete-node { color: #dc3545; font-size: 0.8rem; background: none; border: 1px solid; }
+        body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 10px auto; padding: 10px; background: #f0f2f5; }
+        h2 { text-align: center; color: #1a73e8; margin-bottom: 20px; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; position: relative; border-left: 5px solid #1a73e8; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; background: #f8f9fa; padding: 10px; border-radius: 8px; }
+        label { font-size: 0.75rem; font-weight: bold; color: #555; display: block; margin-bottom: 2px; }
+        select, input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; box-sizing: border-box; background: white; }
+        button { cursor: pointer; padding: 12px; border: none; border-radius: 6px; font-weight: bold; transition: opacity 0.2s; }
+        button:active { opacity: 0.7; }
+        .btn-scan { background: #1a73e8; color: white; margin-top: 8px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-add { background: #34a853; color: white; width: 100%; font-size: 1.1rem; margin-top: 10px; }
+        .btn-copy { background: #1a73e8; color: white; flex: 2; }
+        .btn-clear { background: #ea4335; color: white; flex: 1; }
+        .footer-controls { display: flex; gap: 10px; margin-top: 30px; padding-bottom: 40px; }
+        #scanner-ui { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1000; }
+        #reader { width: 100%; max-width: 400px; margin: 50px auto; background: white; border-radius: 8px; overflow: hidden; }
+        .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .delete-node { color: #ea4335; font-size: 0.8rem; background: #fff1f0; padding: 5px 10px; border: 1px solid #ffa39e; }
+        hr { border: 0; border-top: 1px dashed #ccc; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -27,123 +32,124 @@
     <div id="nodes-container"></div>
 
     <button class="btn-add" onclick="addNode()">+ Add New Swap Node</button>
-    <hr>
     
-    <div style="margin-top: 20px;">
+    <div class="footer-controls">
         <button class="btn-copy" onclick="copyToClipboard()">Copy All Information</button>
         <button class="btn-clear" onclick="clearData()">Clear All</button>
     </div>
 
-    <div id="scanner-ui" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; text-align:center; padding-top:50px;">
-        <div id="reader" style="display:block; background:white;"></div>
-        <button onclick="stopScanner()" style="margin-top:20px; padding:15px 30px;">Cancel</button>
+    <div id="scanner-ui">
+        <div id="reader"></div>
+        <div style="text-align: center;">
+            <button onclick="stopScanner()" style="background: white; color: black; margin-top: 20px; padding: 15px 40px;">Cancel Scan</button>
+        </div>
     </div>
 
 <script>
-    let nodeCount = 0;
+    let nodeIndex = 0;
     let currentTargetInput = null;
-    const html5QrCode = new Html5Qrcode("reader");
+    let html5QrCode = null;
 
-    // Initialize with one node
+    // Load first node on start
     window.onload = () => addNode();
 
     function addNode() {
-        nodeCount++;
+        nodeIndex++;
         const container = document.getElementById('nodes-container');
-        const html = `
-            <div class="card" id="node-${nodeCount}">
-                <div class="node-header">
-                    <strong>Node #${nodeCount}</strong>
-                    <button class="delete-node" onclick="removeNode(${nodeCount})">Remove</button>
-                </div>
-                
-                <label>Backup SN</label>
-                <input type="text" id="backup-sn-${nodeCount}" placeholder="Scan or type SN">
-                <button class="btn-scan" onclick="startScanner('backup-sn-${nodeCount}')">📷 Scan Backup</button>
+        const nodeWrapper = document.createElement('div');
+        nodeWrapper.className = 'card';
+        nodeWrapper.id = `node-card-${nodeIndex}`;
+        
+        // Define Rows A-J
+        const rows = ['A','B','C','D','E','F','G','H','I','J'];
+        
+        // Generate dropdown options
+        const dhOptions = Array.from({length: 10}, (_, i) => `<option value="V1.${i+1}">V1.${i+1}</option>`).join('');
+        const rowOptions = rows.map(r => `<option value="${r}">${r}</option>`).join('');
+        const rackOptions = Array.from({length: 15}, (_, i) => `<option value="${(i+1).toString().padStart(2,'0')}">${(i+1).toString().padStart(2,'0')}</option>`).join('');
+        const uOptions = Array.from({length: 40}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('');
 
-                <div class="grid">${getLocationFields('backup', nodeCount)}</div>
-                
-                <hr>
+        nodeWrapper.innerHTML = `
+            <div class="node-header">
+                <strong>Unit Information #${nodeIndex}</strong>
+                ${nodeIndex > 1 ? `<button class="delete-node" onclick="removeNode(${nodeIndex})">Remove</button>` : ''}
+            </div>
+            
+            <label>Backup SN</label>
+            <input type="text" id="backup-sn-${nodeIndex}" placeholder="Scan or type SN" value="">
+            <button class="btn-scan" onclick="startScanner('backup-sn-${nodeIndex}')">📷 Scan Backup</button>
 
-                <label>Faulty SN</label>
-                <input type="text" id="faulty-sn-${nodeCount}" placeholder="Scan or type SN">
-                <button class="btn-scan" onclick="startScanner('faulty-sn-${nodeCount}')">📷 Scan Faulty</button>
+            <div class="grid">
+                <div><label>Data Hall</label><select id="backup-dh-${nodeIndex}">${dhOptions}</select></div>
+                <div><label>Row</label><select id="backup-row-${nodeIndex}">${rowOptions}</select></div>
+                <div><label>Rack No</label><select id="backup-rack-${nodeIndex}">${rackOptions}</select></div>
+                <div><label>U Number</label><select id="backup-u-${nodeIndex}">${uOptions}</select></div>
+            </div>
+            
+            <hr>
 
-                <div class="grid">${getLocationFields('faulty', nodeCount)}</div>
+            <label>Faulty SN</label>
+            <input type="text" id="faulty-sn-${nodeIndex}" placeholder="Scan or type SN" value="">
+            <button class="btn-scan" onclick="startScanner('faulty-sn-${nodeIndex}')">📷 Scan Faulty</button>
+
+            <div class="grid">
+                <div><label>Data Hall</label><select id="faulty-dh-${nodeIndex}">${dhOptions}</select></div>
+                <div><label>Row</label><select id="faulty-row-${nodeIndex}">${rowOptions}</select></div>
+                <div><label>Rack No</label><select id="faulty-rack-${nodeIndex}">${rackOptions}</select></div>
+                <div><label>U Number</label><select id="faulty-u-${nodeIndex}">${uOptions}</select></div>
             </div>
         `;
-        container.insertAdjacentHTML('beforeend', html);
+        container.appendChild(nodeWrapper);
     }
 
-    function getLocationFields(type, id) {
-        return `
-            <div>
-                <label>Data Hall</label>
-                <select id="${type}-dh-${id}">
-                    ${Array.from({length: 10}, (_, i) => `<option value="V1.${i+1}">V1.${i+1}</option>`).join('')}
-                </select>
-            </div>
-            <div>
-                <label>Row</label>
-                <select id="${type}-row-${id}">
-                    ${['A','B','C','D','E','F'].map(r => `<option value="${r}">${r}</option>`).join('')}
-                </select>
-            </div>
-            <div>
-                <label>Rack No</label>
-                <select id="${type}-rack-${id}">
-                    ${Array.from({length: 15}, (_, i) => `<option value="${(i+1).toString().padStart(2,'0')}">${(i+1).toString().padStart(2,'0')}</option>`).join('')}
-                </select>
-            </div>
-            <div>
-                <label>U Number</label>
-                <select id="${type}-u-${id}">
-                    ${Array.from({length: 40}, (_, i) => `<option value="${i+1}">${i+1}</option>`).join('')}
-                </select>
-            </div>
-        `;
-    }
-
-    function removeNode(id) {
-        document.getElementById(`node-${id}`).remove();
+    function removeNode(idx) {
+        const el = document.getElementById(`node-card-${idx}`);
+        if (el) el.remove();
     }
 
     function startScanner(inputId) {
         currentTargetInput = inputId;
         document.getElementById('scanner-ui').style.display = 'block';
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
         html5QrCode.start(
             { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 150 } },
-            (decodedText) => {
-                document.getElementById(currentTargetInput).value = decodedText;
+            { fps: 15, qrbox: { width: 250, height: 150 } },
+            (text) => {
+                document.getElementById(currentTargetInput).value = text;
                 stopScanner();
             }
-        ).catch(err => alert("Camera error: " + err));
-    }
-
-    function stopScanner() {
-        html5QrCode.stop().then(() => {
+        ).catch(err => {
+            alert("Camera Access Denied or No HTTPS connection.");
             document.getElementById('scanner-ui').style.display = 'none';
         });
     }
 
-    function formatLoc(type, id) {
-        const dh = document.getElementById(`${type}-dh-${id}`).value;
-        const row = document.getElementById(`${type}-row-${id}`).value;
-        const rack = document.getElementById(`${type}-rack-${id}`).value;
-        const u = document.getElementById(`${type}-u-${id}`).value;
-        // Example: V1-1.OS30 A01/U11
-        const formattedDh = dh.replace('.', '-');
-        return `${formattedDh}.OS30 ${row}${rack}/U${u}`;
+    function stopScanner() {
+        if (html5QrCode) {
+            html5QrCode.stop().finally(() => {
+                document.getElementById('scanner-ui').style.display = 'none';
+            });
+        }
+    }
+
+    function formatLoc(type, idx) {
+        const dh = document.getElementById(`${type}-dh-${idx}`).value.replace('.', '-');
+        const row = document.getElementById(`${type}-row-${idx}`).value;
+        const rack = document.getElementById(`${type}-rack-${idx}`).value;
+        const u = document.getElementById(`${type}-u-${idx}`).value;
+        return `${dh}.OS30 ${row}${rack}/U${u}`;
     }
 
     function copyToClipboard() {
         const today = new Date().toLocaleDateString('en-GB');
         let output = `SWAP NODE\nDATE : ${today}\n\n`;
         
-        const nodes = document.querySelectorAll('.card');
-        nodes.forEach((node) => {
-            const id = node.id.split('-')[1];
+        const cards = document.querySelectorAll('.card');
+        if (cards.length === 0) return alert("No data to copy.");
+
+        cards.forEach((card) => {
+            const id = card.id.replace('node-card-', '');
             output += `Backup SN : ${document.getElementById(`backup-sn-${id}`).value}\n`;
             output += `Location : ${formatLoc('backup', id)}\n`;
             output += `Faulty SN : ${document.getElementById(`faulty-sn-${id}`).value}\n`;
@@ -151,14 +157,14 @@
         });
 
         navigator.clipboard.writeText(output.trim()).then(() => {
-            alert("Information copied to clipboard!");
+            alert("All node information copied!");
         });
     }
 
     function clearData() {
-        if(confirm("Are you sure you want to clear all data?")) {
+        if(confirm("This will clear all entries. Continue?")) {
             document.getElementById('nodes-container').innerHTML = '';
-            nodeCount = 0;
+            nodeIndex = 0;
             addNode();
         }
     }

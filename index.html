@@ -20,9 +20,10 @@
         .btn-clear { background: #ea4335; color: white; flex: 1; }
         .footer-controls { display: flex; gap: 10px; margin-top: 30px; padding-bottom: 40px; }
         #scanner-ui { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1000; }
-        #reader { width: 100%; max-width: 400px; margin: 50px auto; background: white; border-radius: 8px; overflow: hidden; }
+        #reader { width: 100%; max-width: 400px; margin: 50px auto 10px; background: white; border-radius: 8px; overflow: hidden; }
         .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .delete-node { color: #ea4335; font-size: 0.8rem; background: #fff1f0; padding: 5px 10px; border: 1px solid #ffa39e; }
+        .scan-status { color: white; text-align: center; font-size: 0.9rem; margin-bottom: 10px; }
         hr { border: 0; border-top: 1px dashed #ccc; margin: 20px 0; }
     </style>
 </head>
@@ -40,8 +41,9 @@
 
     <div id="scanner-ui">
         <div id="reader"></div>
+        <div class="scan-status">Scanning for Barcode or QR Code...</div>
         <div style="text-align: center;">
-            <button onclick="stopScanner()" style="background: white; color: black; margin-top: 20px; padding: 15px 40px;">Cancel Scan</button>
+            <button onclick="stopScanner()" style="background: white; color: black; padding: 15px 40px;">Cancel Scan</button>
         </div>
     </div>
 
@@ -50,7 +52,6 @@
     let currentTargetInput = null;
     let html5QrCode = null;
 
-    // Load first node on start
     window.onload = () => addNode();
 
     function addNode() {
@@ -60,10 +61,7 @@
         nodeWrapper.className = 'card';
         nodeWrapper.id = `node-card-${nodeIndex}`;
         
-        // Define Rows A-J
         const rows = ['A','B','C','D','E','F','G','H','I','J'];
-        
-        // Generate dropdown options
         const dhOptions = Array.from({length: 10}, (_, i) => `<option value="V1.${i+1}">V1.${i+1}</option>`).join('');
         const rowOptions = rows.map(r => `<option value="${r}">${r}</option>`).join('');
         const rackOptions = Array.from({length: 15}, (_, i) => `<option value="${(i+1).toString().padStart(2,'0')}">${(i+1).toString().padStart(2,'0')}</option>`).join('');
@@ -76,7 +74,7 @@
             </div>
             
             <label>Backup SN</label>
-            <input type="text" id="backup-sn-${nodeIndex}" placeholder="Scan or type SN" value="">
+            <input type="text" id="backup-sn-${nodeIndex}" placeholder="Scan Barcode/QR" value="">
             <button class="btn-scan" onclick="startScanner('backup-sn-${nodeIndex}')">📷 Scan Backup</button>
 
             <div class="grid">
@@ -89,7 +87,7 @@
             <hr>
 
             <label>Faulty SN</label>
-            <input type="text" id="faulty-sn-${nodeIndex}" placeholder="Scan or type SN" value="">
+            <input type="text" id="faulty-sn-${nodeIndex}" placeholder="Scan Barcode/QR" value="">
             <button class="btn-scan" onclick="startScanner('faulty-sn-${nodeIndex}')">📷 Scan Faulty</button>
 
             <div class="grid">
@@ -112,15 +110,21 @@
         document.getElementById('scanner-ui').style.display = 'block';
         if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
 
+        const config = { 
+            fps: 15, 
+            qrbox: { width: 280, height: 200 },
+            aspectRatio: 1.0 
+        };
+
         html5QrCode.start(
             { facingMode: "environment" }, 
-            { fps: 15, qrbox: { width: 250, height: 150 } },
+            config,
             (text) => {
                 document.getElementById(currentTargetInput).value = text;
                 stopScanner();
             }
         ).catch(err => {
-            alert("Camera Access Denied or No HTTPS connection.");
+            alert("Camera Error: Ensure you are on HTTPS and have given camera permissions.");
             document.getElementById('scanner-ui').style.display = 'none';
         });
     }
@@ -146,7 +150,7 @@
         let output = `SWAP NODE\nDATE : ${today}\n\n`;
         
         const cards = document.querySelectorAll('.card');
-        if (cards.length === 0) return alert("No data to copy.");
+        if (cards.length === 0) return alert("No nodes to copy.");
 
         cards.forEach((card) => {
             const id = card.id.replace('node-card-', '');
@@ -157,7 +161,7 @@
         });
 
         navigator.clipboard.writeText(output.trim()).then(() => {
-            alert("All node information copied!");
+            alert("Copied to clipboard!");
         });
     }
 
